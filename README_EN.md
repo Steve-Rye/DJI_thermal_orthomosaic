@@ -15,6 +15,13 @@ Custom analysis and processing of thermal photos to directly obtain temperature 
 
 >DJI has released the [DJI Thermal SDK](https://www.dji.com/downloads/softwares/dji-thermal-sdk), allowing users to develop their own specialized software on Windows or Linux platforms to process R-JPEG thermal photos and perform temperature measurements.
 
+Note: This project includes only the core functionality files of the DJI Thermal SDK. For the complete SDK, please download from the official website. The retained files include:
+- Core API files (tsdk-core/api/)
+- Windows 64-bit runtime libraries (tsdk-core/lib/windows/release_x64/)
+- Windows 64-bit executables (utility/bin/windows/release_x64/)
+- License file (License.txt)
+- Basic documentation (Readme.md)
+
 ## Overview
 
 This tutorial demonstrates how to process thermal image data captured by DJI thermal cameras (supporting models like M2EA, M30T, etc.) and import the images into Pix4Dmapper for orthomosaic stitching.

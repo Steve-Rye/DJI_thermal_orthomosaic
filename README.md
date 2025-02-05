@@ -15,6 +15,13 @@ DJI拍摄的热红外照片的像素点上并没有直接保存温度信息，�
 
 >DJI官方开放了[DJI Thermal SDK](https://www.dji.com/cn/downloads/softwares/dji-thermal-sdk)，可以让用户可以在Windows或Linux中借助该SDK开发出自己的专用软件，实现对R-JPEG红外照片的处理和温度测量等功能
 
+注意：本项目仅包含DJI Thermal SDK的核心功能文件，完整SDK请从官方网站下载。保留的文件包括：
+- 核心API文件 (tsdk-core/api/)
+- Windows 64位运行库 (tsdk-core/lib/windows/release_x64/)
+- Windows 64位可执行文件 (utility/bin/windows/release_x64/)
+- 许可证文件 (License.txt)
+- 基本说明文档 (Readme.md)
+
 ## 概述
 
 本教程用于展示如何处理DJI热红外相机拍摄的图像数据（型号支持M2EA、M30T等），并将图像导入Pix4Dmapper中进行正射拼接
