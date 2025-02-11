@@ -14,29 +14,8 @@ DJI 图像元数据提取工具
 功能描述:
 ---------
 从DJI相机拍摄的JPG图像中提取元数据，包括：
-- GPS坐标信息
-- 相机姿态信息（Yaw/Pitch/Roll）
-- RTK精度信息
-
-工作流程:
---------
-1. 处理指定目录下所有子文件夹
-2. 处理每个文件夹中的JPG图像
-3. 提取XMP元数据
-4. 生成标准格式的pos.txt文件
-
-输出格式:
---------
-pos.txt包含以下字段:
-- 照片名称
-- 纬度
-- 经度
-- 高度
-- Yaw
-- Pitch
-- Roll
-- 水平精度
-- 垂直精度
+- 所有包含'dji'、'GPS'、'image'或'rtk'关键字的XMP和EXIF标签（不区分大小写）
+- 将所有匹配的标签及其值导出到txt文件，文件名作为第一列
 """
 
 class MetadataProcessor:
@@ -45,22 +24,15 @@ class MetadataProcessor:
     def __init__(self):
         """初始化处理器"""
         self.temp_dir = self._create_temp_dir()
-        self.fieldnames = [
-            '照片名称', '纬度', '经度', '高度',
-            'Yaw', 'Pitch', 'Roll',
-            '水平精度', '垂直精度'
-        ]
-
+        # 用于存储所有发现的标签名称
+        self.all_tags = set(['ImageName'])  # 始终包含图片名称
+        
     def _create_temp_dir(self) -> Path:
         """
         创建临时工作目录
         
-        Returns:
+        返回值:
             Path: 临时目录路径
-            
-        Notes:
-            - 优先使用系统临时目录
-            - 如果系统临时目录不可用，则在当前目录创建
         """
         try:
             temp_base = Path(tempfile.gettempdir())
@@ -73,48 +45,15 @@ class MetadataProcessor:
             fallback_dir.mkdir(parents=True, exist_ok=True)
             return fallback_dir
 
-    @staticmethod
-    def _process_coordinate(value: str, is_latitude: bool = True) -> str:
-        """
-        处理GPS坐标值
-        
-        Args:
-            value: 原始坐标值字符串
-            is_latitude: 是否为纬度值（用于范围验证）
-            
-        Returns:
-            str: 处理后的坐标值，无效则返回空字符串
-            
-        Notes:
-            - 纬度范围: [-90, 90]
-            - 经度范围: [-180, 180]
-        """
-        try:
-            value = value.strip()
-            if not value:
-                return ''
-                
-            coord = float(value)
-            valid_range = (-90, 90) if is_latitude else (-180, 180)
-            
-            return str(coord) if valid_range[0] <= coord <= valid_range[1] else ''
-                
-        except ValueError:
-            return ''
-
     def extract_metadata(self, jpg_path: Union[str, Path]) -> Optional[Dict[str, str]]:
         """
         从单个JPG文件中提取元数据
         
-        Args:
+        参数:
             jpg_path: JPG文件路径
             
-        Returns:
+        返回值:
             Optional[Dict[str, str]]: 提取的元数据字典，提取失败返回None
-            
-        Notes:
-            - 使用临时文件避免中文路径问题
-            - 自动处理RTK状态相关的精度信息
         """
         temp_jpg = None
         try:
@@ -126,33 +65,31 @@ class MetadataProcessor:
             
             with pyexiv2.Image(str(temp_jpg)) as img:
                 xmp_data = img.read_xmp()
+                exif_data = img.read_exif()
                 
-                # 根据RTK状态设置精度值
-                rtk_std_lat = xmp_data.get('Xmp.drone-dji.RtkStdLat', '')
-                horizontal_accuracy = 0.03 if rtk_std_lat else 2
-                vertical_accuracy = 0.06 if rtk_std_lat else 10
-
-                # 提取并处理坐标数据
-                latitude = self._process_coordinate(
-                    xmp_data.get('Xmp.drone-dji.GpsLatitude', ''), True)
-                longitude = self._process_coordinate(
-                    xmp_data.get('Xmp.drone-dji.GpsLongitude', ''), False)
-
-                metadata = {
-                    '照片名称': jpg_path.name,
-                    '纬度': latitude,
-                    '经度': longitude,
-                    '高度': xmp_data.get('Xmp.drone-dji.AbsoluteAltitude', '').lstrip('+'),
-                    'Yaw': xmp_data.get('Xmp.drone-dji.GimbalYawDegree', '').lstrip('+'),
-                    'Pitch': xmp_data.get('Xmp.drone-dji.GimbalPitchDegree', '').lstrip('+'),
-                    'Roll': xmp_data.get('Xmp.drone-dji.GimbalRollDegree', '').lstrip('+'),
-                    '水平精度': horizontal_accuracy,
-                    '垂直精度': vertical_accuracy
-                }
+                # 初始化元数据字典，添加图片名称
+                metadata = {'ImageName': jpg_path.name}
                 
-                # 验证数据有效性
-                if all(value == '' for key, value in metadata.items() if key != '照片名称'):
-                    print(f"警告: {jpg_path.name} 未找到有效元数据")
+                # 筛选关键字
+                keywords = ['dji', 'gps', 'image', 'rtk']  # 添加rtk关键字
+                
+                # 处理XMP标签
+                for tag, value in xmp_data.items():
+                    tag_lower = tag.lower()
+                    if any(keyword in tag_lower for keyword in keywords):
+                        metadata[tag] = str(value).lstrip('+')  # 移除可能的前导加号
+                        self.all_tags.add(tag)  # 记录标签名称
+
+                # 处理EXIF标签
+                for tag, value in exif_data.items():
+                    tag_lower = tag.lower()
+                    if any(keyword in tag_lower for keyword in keywords):
+                        metadata[tag] = str(value).lstrip('+')  # 移除可能的前导加号
+                        self.all_tags.add(tag)  # 记录标签名称
+                
+                # 验证是否找到任何元数据
+                if len(metadata) <= 1:  # 只有ImageName
+                    print(f"警告: {jpg_path.name} 中未找到匹配的元数据")
                     return None
                     
                 return metadata
@@ -171,29 +108,31 @@ class MetadataProcessor:
         """
         将元数据保存为pos.txt文件
         
-        Args:
+        参数:
             data: 元数据列表
             folder_path: 输出文件夹路径
-            
-        Notes:
-            - 使用固定的pos.txt文件名
-            - UTF-8编码保存
-            - CSV格式（逗号分隔）
         """
         if not data:
             return
             
         output_path = Path(folder_path) / "pos.txt"
         
+        # 构建字段列表，确保ImageName为第一列
+        other_tags = sorted(list(self.all_tags - {'ImageName'}))  # 移除ImageName并对其他标签排序
+        fieldnames = ['ImageName'] + other_tags  # 将ImageName放在开头
+        
+        print(f"\n发现的标签数量: {len(fieldnames)}")
+        
         with output_path.open('w', encoding='utf-8') as txtfile:
             # 写入表头
-            txtfile.write(','.join(self.fieldnames) + '\n')
+            txtfile.write(','.join(fieldnames) + '\n')
             
             # 写入数据行
             for row in data:
-                if row:
-                    line = ','.join(str(row[field]) for field in self.fieldnames)
-                    txtfile.write(line + '\n')
+                values = []
+                for field in fieldnames:
+                    values.append(str(row.get(field, '')))  # 如果标签不存在则使用空字符串
+                txtfile.write(','.join(values) + '\n')
         
         print(f"已生成: {output_path}")
 
@@ -202,10 +141,10 @@ class MetadataProcessor:
         """
         查找所有子文件夹
         
-        Args:
+        参数:
             base_dir: 基础目录路径
             
-        Returns:
+        返回值:
             List[Path]: 找到的子文件夹路径列表
         """
         subfolders = []
@@ -227,7 +166,7 @@ class MetadataProcessor:
         """
         处理单个文件夹中的所有JPG文件
         
-        Args:
+        参数:
             folder_path: 待处理的文件夹路径
         """
         folder_path = Path(folder_path)
@@ -261,7 +200,7 @@ class MetadataProcessor:
         """
         处理指定目录下所有子文件夹
         
-        Args:
+        参数:
             root_dir: 根目录路径，默认为'main'
         """
         try:
@@ -273,7 +212,9 @@ class MetadataProcessor:
             subfolders = self.find_subfolders(root_path)
             
             if not subfolders:
-                print("未找到任何子文件夹")
+                # 如果没有子文件夹，直接处理当前目录
+                print("未找到子文件夹，处理当前目录")
+                self.process_folder(root_path)
                 return
                 
             print(f"找到 {len(subfolders)} 个子文件夹")
