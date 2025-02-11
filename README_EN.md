@@ -26,17 +26,21 @@ Note: This project includes only the core functionality files of the DJI Thermal
 
 This tutorial demonstrates how to process thermal image data captured by DJI thermal cameras (supporting models like M2EA, M30T, etc.) and import the images into Pix4Dmapper for orthomosaic stitching.
 
-### Image Conversion and Geographic Information Data Extraction
+### Image Conversion and Metadata Extraction
 
-Convert JPG images captured by DJI thermal cameras into TIFF format images with temperature information, and extract geographic information data including GPS coordinates and POS information from the images. This facilitates subsequent import into photogrammetry software (Pix4Dmapper) for stitching, enabling thermal/temperature analysis.
+Convert JPG images captured by DJI thermal cameras into TIFF format images with temperature information, and extract metadata including GPS coordinates and POS information from the images, facilitating subsequent import into photogrammetry software (Pix4Dmapper) for stitching or thermal/temperature analysis.
 
->Here's a comparison before and after conversion. As shown, before conversion, each pixel in the JPG image represents its RGB value, making it impossible to obtain the specific temperature value. After conversion, each pixel represents the surface radiation temperature of the object. For more details on the conversion principle, see [TSDK (Thermal SDK) FAQ (Continuously Updated)](https://bbs.dji.com/pro/detail?tid=290236)
+>Here's a comparison before and after conversion. As shown, before conversion, each pixel in the JPG image represents its RGB value, making it impossible to obtain the specific temperature value. After conversion, each pixel in the tiff image represents the surface radiation temperature of the object. For more details on the conversion principle, see [TSDK (Thermal SDK) FAQ (Continuously Updated)](https://bbs.dji.com/pro/detail?tid=290236)
 
 ![](./assets/images/RJPG_demo.png)
 
 ![](./assets/images/tiff_demo.png)
 
->The geographic information data extraction function is similar to DJI Terra's POS data export function (see [DJI Terra "Image POS Data" Feature Introduction](https://support.dji.com/help/content?customId=en03400005094&spaceId=34&re=Global&lang=en&documentType=article&paperDocType=paper)). The resulting POS data file is in TXT format. POS data can be used for more accurate image geolocation and distortion correction. The final image stitching result is shown below:
+>The metadata extraction function is similar to DJI Terra's pos data export function. For details, see [DJI Terra "Image POS Data" Feature Introduction](https://support.dji.com/help/content?customId=zh-cn03400005094&spaceId=34&re=CN&lang=zh-CN&documentType=artical&paperDocType=paper). The extracted metadata file is in txt format and contains various parameter information about the drone and its gimbal camera, which can be used for more accurate image geolocation and distortion correction analysis.
+
+### Import into Pix4Dmapper for Stitching
+
+Import the converted tiff images into Pix4Dmapper for mosaic stitching. The final stitching result is shown below:
 
 ![](./assets/images/pix4d_demo.png)
 
@@ -77,8 +81,8 @@ project_folder
         └── DJI_YYYYMMDDHHMMSS_xxxx_T.JPG
         └── ......
 └── extract_metadata.py
-└── jpg2tiff&pos_edit.py
-└── rename_tiff2jpg.py
+└── jpg2tiff.py
+└── copy_metadata.py
 └── dji_thermal_sdk_v1.5_20240507/
 └── environment.yml
 ```
@@ -132,11 +136,7 @@ Notes:
 
 ### Running Python Scripts
 
-Configure conda environment in PyCharm and run the following script files in order:
-
-- extract_metadata.py
-- jpg2tiff&pos_edit.py
-- rename_tiff2jpg.py
+Configure conda environment in PyCharm and run the script file `main.py`
 
 ### Output Results
 
@@ -149,20 +149,17 @@ main/
         └── DJI_20250117111343_0139_T.JPG
         └── DJI_YYYYMMDDHHMMSS_xxxx_T.JPG
         └── ......
-    └── out_dir/    # Contains converted jpg images (displaying temperature information as grayscale values)
-        └── DJI_20250117111343_0139_T.jpg
-        └── DJI_YYYYMMDDHHMMSS_xxxx_T.jpg
+    └── out_dir/    # Contains converted temperature images (displaying temperature information as grayscale values)
+        └── DJI_20250117111343_0139_T.tiff
+        └── DJI_YYYYMMDDHHMMSS_xxxx_T.tiff
         └── ......
-    └── pos/        # Contains pos.txt and posT.txt files
-        └── pos.txt
-        └── posT.txt
+    └── metadata.txt     # Contains metadata for each image
 ```
 
 ### Stitching in Pix4Dmapper
 
 Similar to general Pix4Dmapper reconstruction projects, but note:
 
-- Import jpg images from the `out_dir` folder into the Pix4Dmapper project
-- Select posT.txt from the `pos` folder as the positioning information file
+- Import TIFF images from the `out_dir` folder into the Pix4Dmapper project, only these images retain temperature information, and the stitched thermal map will retain temperature information
 - Choose `Thermal Camera` as the processing template
 - If multiple stitching attempts fail, click "Process" > "Processing Options" in the menu bar, in the "Processing Options" dialog that appears, set "Keypoints Image Scale" to 1/2, 1/4, or 1/8, and try multiple times. For detailed principles, see [Menu Process > Processing Options... > 1. Initial Processing > General - PIX4Dmapper](https://support.pix4d.com/hc/en-us/articles/202557759)
