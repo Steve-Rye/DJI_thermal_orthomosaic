@@ -106,7 +106,7 @@ class MetadataProcessor:
 
     def save_to_txt(self, data: List[Dict[str, str]], folder_path: Union[str, Path]) -> None:
         """
-        将元数据保存为pos.txt文件
+        将元数据保存为metadata.txt文件
         
         参数:
             data: 元数据列表
@@ -115,7 +115,7 @@ class MetadataProcessor:
         if not data:
             return
             
-        output_path = Path(folder_path) / "pos.txt"
+        output_path = Path(folder_path) / "metadata.txt"
         
         # 构建字段列表，确保ImageName为第一列
         other_tags = sorted(list(self.all_tags - {'ImageName'}))  # 移除ImageName并对其他标签排序
